@@ -55,14 +55,39 @@ def create_default_data():
         {"code": "POS-CHARGE", "name": "POS Charge"},
         {"code": "PAYMENT", "name": "Payment Credit"}
     ]
-    # Determine a valid item group
+    # Determine a valid item group — create "Services" if nothing suitable exists
     if frappe.db.exists("Item Group", "Services"):
         default_item_group = "Services"
     elif frappe.db.exists("Item Group", "All Item Groups"):
         default_item_group = "All Item Groups"
     else:
-        # Fallback: pick any existing Item Group (every Frappe site has at least one)
-        default_item_group = frappe.db.get_value("Item Group", filters={}, fieldname="name")
+        # Find any existing root item group to use as parent
+        root_group = frappe.db.get_value(
+            "Item Group",
+            filters={"is_group": 1},
+            fieldname="name",
+            order_by="lft asc"
+        )
+        if not root_group:
+            # Absolute fallback: pick any Item Group at all
+            root_group = frappe.db.get_value("Item Group", {}, "name")
+
+        if root_group:
+            # Create a "Services" group under the root
+            services_group = frappe.get_doc({
+                "doctype": "Item Group",
+                "item_group_name": "Services",
+                "parent_item_group": root_group
+            })
+            services_group.insert(ignore_permissions=True)
+            default_item_group = "Services"
+        else:
+            # No Item Groups exist at all — skip item creation
+            frappe.log_error(
+                "Hospitality Core Setup: No Item Groups found. Skipping service item creation.",
+                "after_install"
+            )
+            return
 
     for i in items:
         if not frappe.db.exists("Item", i["code"]):

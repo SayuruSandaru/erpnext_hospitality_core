@@ -55,11 +55,20 @@ def create_default_data():
         {"code": "POS-CHARGE", "name": "POS Charge"},
         {"code": "PAYMENT", "name": "Payment Credit"}
     ]
+    # Determine a valid item group
+    if frappe.db.exists("Item Group", "Services"):
+        default_item_group = "Services"
+    elif frappe.db.exists("Item Group", "All Item Groups"):
+        default_item_group = "All Item Groups"
+    else:
+        # Fallback: pick any existing Item Group (every Frappe site has at least one)
+        default_item_group = frappe.db.get_value("Item Group", filters={}, fieldname="name")
+
     for i in items:
         if not frappe.db.exists("Item", i["code"]):
             item = frappe.new_doc("Item")
             item.item_code = i["code"]
             item.item_name = i["name"]
-            item.item_group = "Services" if frappe.db.exists("Item Group", "Services") else "All Item Groups"
+            item.item_group = default_item_group
             item.is_stock_item = 0
             item.insert(ignore_permissions=True)
